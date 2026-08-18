@@ -1,0 +1,112 @@
+export const mockConversations = [
+  {
+    id: "conv-1",
+    guestName: "Michael Chen",
+    initials: "MC",
+    propertyTitle: "Sunny Beach House",
+    lastMessage: "That sounds perfect! Is parking included?",
+    time: "10:42 AM",
+    unreadCount: 1,
+    messages: [
+      {
+        id: "m-101",
+        sender: "host",
+        text: "Hi Michael, thanks for your interest in the Sunny Beach House! The dates you requested are available.",
+        time: "10:30 AM",
+      },
+      {
+        id: "m-102",
+        sender: "host",
+        text: "Let me know if you have any questions about the amenities or the area.",
+        time: "10:31 AM",
+      },
+      {
+        id: "m-103",
+        sender: "guest",
+        text: "That sounds perfect! Is parking included?",
+        time: "10:42 AM",
+      },
+    ],
+  },
+  {
+    id: "conv-2",
+    guestName: "Sarah Jenkins",
+    initials: "SJ",
+    propertyTitle: "Downtown Loft",
+    lastMessage: "Thank you for the information. I'll get back to you.",
+    time: "Yesterday",
+    unreadCount: 0,
+    messages: [
+      {
+        id: "m-201",
+        sender: "guest",
+        text: "Hi! Is the check-in time flexible for this Friday?",
+        time: "Yesterday 2:15 PM",
+      },
+      {
+        id: "m-202",
+        sender: "host",
+        text: "Hello Sarah! Yes, early check-in is possible after 2 PM once cleaning is complete.",
+        time: "Yesterday 2:40 PM",
+      },
+      {
+        id: "m-203",
+        sender: "guest",
+        text: "Thank you for the information. I'll get back to you.",
+        time: "Yesterday 3:00 PM",
+      },
+    ],
+  },
+  {
+    id: "conv-3",
+    guestName: "David Wright",
+    initials: "DW",
+    propertyTitle: "Mountain View Cabin",
+    lastMessage: "We had a wonderful time! Left a review.",
+    time: "Oct 12",
+    unreadCount: 0,
+    messages: [
+      {
+        id: "m-301",
+        sender: "guest",
+        text: "Where can we find the extra blankets for the sofa bed?",
+        time: "Oct 11 8:20 PM",
+      },
+      {
+        id: "m-302",
+        sender: "host",
+        text: "Hi David! You'll find extra bedding inside the hallway linen closet on the top shelf.",
+        time: "Oct 11 8:22 PM",
+      },
+      {
+        id: "m-303",
+        sender: "guest",
+        text: "Got them, thank you! We had a wonderful time! Left a review.",
+        time: "Oct 12 10:15 AM",
+      },
+    ],
+  },
+  {
+    id: "conv-4",
+    guestName: "Emma Watson",
+    initials: "EW",
+    propertyTitle: "Lakeside Villa",
+    lastMessage: "Can we bring a small trained dog?",
+    time: "Oct 08",
+    unreadCount: 2,
+    messages: [
+      {
+        id: "m-401",
+        sender: "guest",
+        text: "Hi there! We are interested in booking for next weekend.",
+        time: "Oct 08 4:00 PM",
+      },
+      {
+        id: "m-402",
+        sender: "guest",
+        text: "Can we bring a small trained dog?",
+        time: "Oct 08 4:01 PM",
+      },
+    ],
+  },
+];

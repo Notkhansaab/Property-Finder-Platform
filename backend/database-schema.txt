@@ -1,0 +1,1159 @@
+Backend Folder Structure
+========================
+
+backend/
+  src/
+    config/
+      db.js                # Database connection and configuration
+    controllers/
+      authController.js
+      usersController.js
+      hostsController.js
+      propertiesController.js
+      bookingsController.js
+      purchasesController.js
+      verificationsController.js
+      messagesController.js
+      wishlistController.js
+      reportsController.js
+      paymentsController.js
+    models/
+      userModel.js
+      hostModel.js
+      propertyModel.js
+      bookingModel.js
+      purchaseModel.js
+      verificationModel.js
+      conversationModel.js
+      messageModel.js
+      wishlistModel.js
+      reportModel.js
+      payoutAccountModel.js
+      paymentModel.js
+    routes/
+      authRoutes.js
+      userRoutes.js
+      hostRoutes.js
+      propertyRoutes.js
+      bookingRoutes.js
+      purchaseRoutes.js
+      verificationRoutes.js
+      messageRoutes.js
+      wishlistRoutes.js
+      reportRoutes.js
+      paymentRoutes.js
+    services/
+      emailService.js
+      paymentService.js
+      reportService.js
+    utils/
+      errorHandler.js
+      validators.js
+  migrations/
+  seeders/
+  tests/
+  .env.example
+  package.json
+  README.md
+  server.js
+
+
+PostgreSQL Database Schema
+==========================
+
+-- Create database
+CREATE DATABASE estate_link;
+
+-- Switch to database
+\c estate_link;
+
+-- Users table stores all accounts: customers, hosts, admins
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  external_id VARCHAR(50) UNIQUE,
+  full_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  phone VARCHAR(50),
+  role VARCHAR(40) NOT NULL DEFAULT 'user',
+  status VARCHAR(40) NOT NULL DEFAULT 'active',
+  avatar_url TEXT,
+  password_hash TEXT,
+  bookings_count INT DEFAULT 0,
+  joined_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Host profile data extends a user account when the user is a host
+CREATE TABLE host_profiles (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  host_code VARCHAR(50) UNIQUE,
+  joined_at TIMESTAMP WITH TIME ZONE,
+  status VARCHAR(40) NOT NULL DEFAULT 'pending',
+  listings_count INT DEFAULT 0,
+  earnings NUMERIC(14,2) DEFAULT 0,
+  rating NUMERIC(3,2),
+  verified BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Properties available for rent, lease, or purchase
+CREATE TABLE properties (
+  id SERIAL PRIMARY KEY,
+  host_id INT NOT NULL REFERENCES host_profiles(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  location VARCHAR(255),
+  category VARCHAR(100),
+  listing_type VARCHAR(50),
+  beds SMALLINT,
+  bedrooms SMALLINT,
+  baths SMALLINT,
+  guests SMALLINT,
+  price NUMERIC(14,2),
+  period VARCHAR(50),
+  rating NUMERIC(3,2),
+  verified BOOLEAN DEFAULT FALSE,
+  main_image TEXT,
+  description TEXT,
+  is_available BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE property_images (
+  id SERIAL PRIMARY KEY,
+  property_id INT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  sort_order SMALLINT DEFAULT 0
+);
+
+CREATE TABLE property_amenities (
+  id SERIAL PRIMARY KEY,
+  property_id INT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  amenity VARCHAR(150) NOT NULL
+);
+
+-- Booking records for rent and lease reservations
+CREATE TABLE bookings (
+  id SERIAL PRIMARY KEY,
+  property_id INT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  user_id INT REFERENCES users(id) ON DELETE SET NULL,
+  check_in DATE NOT NULL,
+  check_out DATE NOT NULL,
+  guests SMALLINT NOT NULL,
+  guest_name VARCHAR(255),
+  guest_email VARCHAR(255),
+  status VARCHAR(50) NOT NULL DEFAULT 'pending',
+  total_amount NUMERIC(14,2),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Purchase requests for properties listed for sale
+CREATE TABLE purchase_requests (
+  id SERIAL PRIMARY KEY,
+  property_id INT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  user_id INT REFERENCES users(id) ON DELETE SET NULL,
+  requested_date DATE,
+  offer_price NUMERIC(14,2) NOT NULL,
+  message TEXT,
+  status VARCHAR(50) NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Host verification requests and document uploads
+CREATE TABLE host_verifications (
+  id SERIAL PRIMARY KEY,
+  host_id INT NOT NULL REFERENCES host_profiles(id) ON DELETE CASCADE,
+  document_type VARCHAR(100),
+  document_number VARCHAR(100),
+  document_front_url TEXT,
+  document_back_url TEXT,
+  selfie_image_url TEXT,
+  submitted_at TIMESTAMP WITH TIME ZONE,
+  status VARCHAR(50) NOT NULL DEFAULT 'pending',
+  property_count INT DEFAULT 0,
+  rejection_reason TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Conversation threads between host and guest
+CREATE TABLE conversations (
+  id SERIAL PRIMARY KEY,
+  property_id INT REFERENCES properties(id) ON DELETE SET NULL,
+  host_id INT REFERENCES host_profiles(id) ON DELETE SET NULL,
+  guest_id INT REFERENCES users(id) ON DELETE SET NULL,
+  last_message TEXT,
+  last_message_at TIMESTAMP WITH TIME ZONE,
+  unread_count INT DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE messages (
+  id SERIAL PRIMARY KEY,
+  conversation_id INT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  sender VARCHAR(50) NOT NULL,
+  text TEXT NOT NULL,
+  sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Wishlist entries for user saved properties
+CREATE TABLE wishlists (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  property_id INT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, property_id)
+);
+
+-- Reports for users, hosts, and properties
+CREATE TABLE reports (
+  id SERIAL PRIMARY KEY,
+  reporter_id INT REFERENCES users(id) ON DELETE SET NULL,
+  target_type VARCHAR(50) NOT NULL,
+  target_id INT NOT NULL,
+  issue_type VARCHAR(150),
+  description TEXT,
+  status VARCHAR(50) NOT NULL DEFAULT 'open',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Payout account details for hosts
+CREATE TABLE payout_accounts (
+  id SERIAL PRIMARY KEY,
+  host_id INT NOT NULL REFERENCES host_profiles(id) ON DELETE CASCADE,
+  account_holder VARCHAR(255),
+  bank_name VARCHAR(255),
+  account_number VARCHAR(100),
+  iban VARCHAR(50),
+  swift VARCHAR(50),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Payment transactions tied to bookings, purchase requests, and properties
+CREATE TABLE payments (
+  id SERIAL PRIMARY KEY,
+  booking_id INT REFERENCES bookings(id) ON DELETE SET NULL,
+  purchase_request_id INT REFERENCES purchase_requests(id) ON DELETE SET NULL,
+  user_id INT REFERENCES users(id) ON DELETE SET NULL,
+  property_id INT REFERENCES properties(id) ON DELETE SET NULL,
+  amount NUMERIC(14,2) NOT NULL,
+  payment_type VARCHAR(50),
+  payment_method VARCHAR(50),
+  status VARCHAR(50) NOT NULL DEFAULT 'pending',
+  paid_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CHAT GPT CODE
+
+
+# Estate Link — PostgreSQL Database Schema
+
+```sql
+-- ============================================================
+-- ESTATE LINK DATABASE
+-- PostgreSQL
+-- ============================================================
+
+-- Create database separately if needed:
+-- CREATE DATABASE estate_link;
+
+-- Then connect to it:
+-- \c estate_link;
+
+
+-- ============================================================
+-- 1. USERS
+-- ============================================================
+
+CREATE TABLE users (
+    id BIGSERIAL PRIMARY KEY,
+
+    external_id VARCHAR(50) UNIQUE,
+
+    full_name VARCHAR(255) NOT NULL,
+
+    email VARCHAR(255) NOT NULL UNIQUE,
+
+    phone VARCHAR(50),
+
+    role VARCHAR(30) NOT NULL DEFAULT 'user'
+        CHECK (role IN ('user', 'host', 'admin')),
+
+    status VARCHAR(30) NOT NULL DEFAULT 'active'
+        CHECK (status IN (
+            'active',
+            'inactive',
+            'suspended',
+            'pending'
+        )),
+
+    avatar_url TEXT,
+
+    password_hash TEXT,
+
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 2. HOST PROFILES
+-- One user can have one host profile.
+-- ============================================================
+
+CREATE TABLE host_profiles (
+    id BIGSERIAL PRIMARY KEY,
+
+    user_id BIGINT NOT NULL UNIQUE
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    host_code VARCHAR(50) UNIQUE,
+
+    status VARCHAR(30) NOT NULL DEFAULT 'pending'
+        CHECK (status IN (
+            'pending',
+            'active',
+            'suspended',
+            'rejected'
+        )),
+
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 3. PROPERTIES
+-- ============================================================
+
+CREATE TABLE properties (
+    id BIGSERIAL PRIMARY KEY,
+
+    host_id BIGINT NOT NULL
+        REFERENCES host_profiles(id)
+        ON DELETE CASCADE,
+
+    title VARCHAR(255) NOT NULL,
+
+    description TEXT,
+
+    property_type VARCHAR(50) NOT NULL
+        CHECK (property_type IN (
+            'hotel',
+            'apartment',
+            'house',
+            'villa',
+            'plot',
+            'office',
+            'commercial',
+            'other'
+        )),
+
+    listing_type VARCHAR(30) NOT NULL
+        CHECK (listing_type IN (
+            'rent',
+            'sale',
+            'lease'
+        )),
+
+    address TEXT,
+
+    city VARCHAR(100),
+
+    state VARCHAR(100),
+
+    country VARCHAR(100),
+
+    latitude NUMERIC(10, 7),
+
+    longitude NUMERIC(10, 7),
+
+    beds SMALLINT CHECK (beds IS NULL OR beds >= 0),
+
+    bedrooms SMALLINT CHECK (bedrooms IS NULL OR bedrooms >= 0),
+
+    baths SMALLINT CHECK (baths IS NULL OR baths >= 0),
+
+    guests SMALLINT CHECK (guests IS NULL OR guests >= 0),
+
+    price NUMERIC(14, 2) NOT NULL
+        CHECK (price >= 0),
+
+    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+
+    price_period VARCHAR(30)
+        CHECK (price_period IN (
+            'night',
+            'day',
+            'week',
+            'month',
+            'year',
+            'total'
+        )),
+
+    status VARCHAR(30) NOT NULL DEFAULT 'pending'
+        CHECK (status IN (
+            'draft',
+            'pending',
+            'active',
+            'rejected',
+            'suspended',
+            'sold',
+            'inactive'
+        )),
+
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+
+    main_image_url TEXT,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 4. PROPERTY IMAGES
+-- ============================================================
+
+CREATE TABLE property_images (
+    id BIGSERIAL PRIMARY KEY,
+
+    property_id BIGINT NOT NULL
+        REFERENCES properties(id)
+        ON DELETE CASCADE,
+
+    image_url TEXT NOT NULL,
+
+    sort_order INT NOT NULL DEFAULT 0,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 5. PROPERTY AMENITIES
+-- ============================================================
+
+CREATE TABLE property_amenities (
+    id BIGSERIAL PRIMARY KEY,
+
+    property_id BIGINT NOT NULL
+        REFERENCES properties(id)
+        ON DELETE CASCADE,
+
+    amenity VARCHAR(150) NOT NULL,
+
+    UNIQUE(property_id, amenity)
+);
+
+
+-- ============================================================
+-- 6. BOOKINGS
+-- Used for rental / lease reservations.
+-- ============================================================
+
+CREATE TABLE bookings (
+    id BIGSERIAL PRIMARY KEY,
+
+    property_id BIGINT NOT NULL
+        REFERENCES properties(id)
+        ON DELETE RESTRICT,
+
+    user_id BIGINT
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    check_in DATE NOT NULL,
+
+    check_out DATE NOT NULL,
+
+    guests SMALLINT NOT NULL
+        CHECK (guests > 0),
+
+    guest_name VARCHAR(255),
+
+    guest_email VARCHAR(255),
+
+    status VARCHAR(30) NOT NULL DEFAULT 'pending'
+        CHECK (status IN (
+            'pending',
+            'confirmed',
+            'cancelled',
+            'rejected',
+            'completed'
+        )),
+
+    total_amount NUMERIC(14, 2)
+        CHECK (total_amount IS NULL OR total_amount >= 0),
+
+    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+
+    cancelled_at TIMESTAMPTZ,
+
+    confirmed_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CHECK (check_out > check_in)
+);
+
+
+-- ============================================================
+-- 7. PURCHASE REQUESTS
+-- Used when a user wants to purchase a property.
+-- ============================================================
+
+CREATE TABLE purchase_requests (
+    id BIGSERIAL PRIMARY KEY,
+
+    property_id BIGINT NOT NULL
+        REFERENCES properties(id)
+        ON DELETE RESTRICT,
+
+    user_id BIGINT
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    requested_date DATE NOT NULL DEFAULT CURRENT_DATE,
+
+    offer_price NUMERIC(14, 2) NOT NULL
+        CHECK (offer_price > 0),
+
+    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+
+    message TEXT,
+
+    status VARCHAR(30) NOT NULL DEFAULT 'pending'
+        CHECK (status IN (
+            'pending',
+            'accepted',
+            'rejected',
+            'withdrawn',
+            'expired',
+            'completed'
+        )),
+
+    responded_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 8. HOST VERIFICATIONS
+-- ============================================================
+
+CREATE TABLE host_verifications (
+    id BIGSERIAL PRIMARY KEY,
+
+    host_id BIGINT NOT NULL
+        REFERENCES host_profiles(id)
+        ON DELETE CASCADE,
+
+    document_type VARCHAR(100) NOT NULL,
+
+    document_number VARCHAR(100),
+
+    document_front_url TEXT,
+
+    document_back_url TEXT,
+
+    selfie_image_url TEXT,
+
+    status VARCHAR(30) NOT NULL DEFAULT 'pending'
+        CHECK (status IN (
+            'pending',
+            'approved',
+            'rejected'
+        )),
+
+    rejection_reason TEXT,
+
+    submitted_at TIMESTAMPTZ DEFAULT NOW(),
+
+    reviewed_by BIGINT
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    reviewed_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 9. CONVERSATIONS
+-- Host <-> Guest conversation for a property.
+-- ============================================================
+
+CREATE TABLE conversations (
+    id BIGSERIAL PRIMARY KEY,
+
+    property_id BIGINT
+        REFERENCES properties(id)
+        ON DELETE SET NULL,
+
+    host_id BIGINT
+        REFERENCES host_profiles(id)
+        ON DELETE SET NULL,
+
+    guest_id BIGINT
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    last_message TEXT,
+
+    last_message_at TIMESTAMPTZ,
+
+    unread_count INT NOT NULL DEFAULT 0
+        CHECK (unread_count >= 0),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 10. MESSAGES
+-- ============================================================
+
+CREATE TABLE messages (
+    id BIGSERIAL PRIMARY KEY,
+
+    conversation_id BIGINT NOT NULL
+        REFERENCES conversations(id)
+        ON DELETE CASCADE,
+
+    sender_id BIGINT NOT NULL
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    message_text TEXT NOT NULL,
+
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    read_at TIMESTAMPTZ
+);
+
+
+-- ============================================================
+-- 11. WISHLISTS
+-- ============================================================
+
+CREATE TABLE wishlists (
+    id BIGSERIAL PRIMARY KEY,
+
+    user_id BIGINT NOT NULL
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    property_id BIGINT NOT NULL
+        REFERENCES properties(id)
+        ON DELETE CASCADE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    UNIQUE(user_id, property_id)
+);
+
+
+-- ============================================================
+-- 12. REVIEWS
+-- ============================================================
+
+CREATE TABLE reviews (
+    id BIGSERIAL PRIMARY KEY,
+
+    property_id BIGINT NOT NULL
+        REFERENCES properties(id)
+        ON DELETE CASCADE,
+
+    user_id BIGINT
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    booking_id BIGINT
+        REFERENCES bookings(id)
+        ON DELETE SET NULL,
+
+    rating SMALLINT NOT NULL
+        CHECK (rating BETWEEN 1 AND 5),
+
+    comment TEXT,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    UNIQUE(user_id, booking_id)
+);
+
+
+-- ============================================================
+-- 13. REPORTS
+-- ============================================================
+
+CREATE TABLE reports (
+    id BIGSERIAL PRIMARY KEY,
+
+    reporter_id BIGINT
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    target_type VARCHAR(30) NOT NULL
+        CHECK (target_type IN (
+            'user',
+            'host',
+            'property',
+            'booking',
+            'message'
+        )),
+
+    target_id BIGINT NOT NULL,
+
+    issue_type VARCHAR(150),
+
+    description TEXT,
+
+    status VARCHAR(30) NOT NULL DEFAULT 'open'
+        CHECK (status IN (
+            'open',
+            'reviewing',
+            'resolved',
+            'dismissed'
+        )),
+
+    reviewed_by BIGINT
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    reviewed_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 14. PAYOUT ACCOUNTS
+-- Store only safe/provider references in production.
+-- Do NOT store raw banking credentials unnecessarily.
+-- ============================================================
+
+CREATE TABLE payout_accounts (
+    id BIGSERIAL PRIMARY KEY,
+
+    host_id BIGINT NOT NULL
+        REFERENCES host_profiles(id)
+        ON DELETE CASCADE,
+
+    provider VARCHAR(50),
+
+    provider_account_id VARCHAR(255),
+
+    account_holder VARCHAR(255),
+
+    bank_name VARCHAR(255),
+
+    last_four VARCHAR(4),
+
+    iban_last_four VARCHAR(4),
+
+    status VARCHAR(30) NOT NULL DEFAULT 'pending'
+        CHECK (status IN (
+            'pending',
+            'active',
+            'disabled'
+        )),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 15. PAYMENTS
+-- ============================================================
+
+CREATE TABLE payments (
+    id BIGSERIAL PRIMARY KEY,
+
+    booking_id BIGINT
+        REFERENCES bookings(id)
+        ON DELETE SET NULL,
+
+    purchase_request_id BIGINT
+        REFERENCES purchase_requests(id)
+        ON DELETE SET NULL,
+
+    user_id BIGINT
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    property_id BIGINT
+        REFERENCES properties(id)
+        ON DELETE SET NULL,
+
+    amount NUMERIC(14, 2) NOT NULL
+        CHECK (amount > 0),
+
+    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+
+    payment_type VARCHAR(50)
+        CHECK (payment_type IN (
+            'booking',
+            'purchase',
+            'refund',
+            'payout',
+            'other'
+        )),
+
+    payment_method VARCHAR(50),
+
+    provider VARCHAR(50),
+
+    transaction_reference VARCHAR(255) UNIQUE,
+
+    status VARCHAR(30) NOT NULL DEFAULT 'pending'
+        CHECK (status IN (
+            'pending',
+            'processing',
+            'completed',
+            'failed',
+            'refunded',
+            'cancelled'
+        )),
+
+    paid_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- 16. NOTIFICATIONS
+-- ============================================================
+
+CREATE TABLE notifications (
+    id BIGSERIAL PRIMARY KEY,
+
+    user_id BIGINT NOT NULL
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    type VARCHAR(100) NOT NULL,
+
+    title VARCHAR(255) NOT NULL,
+
+    message TEXT NOT NULL,
+
+    related_type VARCHAR(50),
+
+    related_id BIGINT,
+
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- INDEXES
+-- ============================================================
+
+
+-- Users
+
+CREATE INDEX idx_users_role
+    ON users(role);
+
+CREATE INDEX idx_users_status
+    ON users(status);
+
+
+-- Hosts
+
+CREATE INDEX idx_host_profiles_status
+    ON host_profiles(status);
+
+CREATE INDEX idx_host_profiles_verified
+    ON host_profiles(verified);
+
+
+-- Properties
+
+CREATE INDEX idx_properties_host_id
+    ON properties(host_id);
+
+CREATE INDEX idx_properties_status
+    ON properties(status);
+
+CREATE INDEX idx_properties_listing_type
+    ON properties(listing_type);
+
+CREATE INDEX idx_properties_property_type
+    ON properties(property_type);
+
+CREATE INDEX idx_properties_city
+    ON properties(city);
+
+CREATE INDEX idx_properties_price
+    ON properties(price);
+
+CREATE INDEX idx_properties_location
+    ON properties(latitude, longitude);
+
+
+-- Images
+
+CREATE INDEX idx_property_images_property_id
+    ON property_images(property_id);
+
+
+-- Amenities
+
+CREATE INDEX idx_property_amenities_property_id
+    ON property_amenities(property_id);
+
+
+-- Bookings
+
+CREATE INDEX idx_bookings_property_id
+    ON bookings(property_id);
+
+CREATE INDEX idx_bookings_user_id
+    ON bookings(user_id);
+
+CREATE INDEX idx_bookings_status
+    ON bookings(status);
+
+CREATE INDEX idx_bookings_dates
+    ON bookings(check_in, check_out);
+
+
+-- Purchase requests
+
+CREATE INDEX idx_purchase_requests_property_id
+    ON purchase_requests(property_id);
+
+CREATE INDEX idx_purchase_requests_user_id
+    ON purchase_requests(user_id);
+
+CREATE INDEX idx_purchase_requests_status
+    ON purchase_requests(status);
+
+
+-- Verification
+
+CREATE INDEX idx_host_verifications_host_id
+    ON host_verifications(host_id);
+
+CREATE INDEX idx_host_verifications_status
+    ON host_verifications(status);
+
+
+-- Conversations
+
+CREATE INDEX idx_conversations_host_id
+    ON conversations(host_id);
+
+CREATE INDEX idx_conversations_guest_id
+    ON conversations(guest_id);
+
+CREATE INDEX idx_conversations_property_id
+    ON conversations(property_id);
+
+
+-- Messages
+
+CREATE INDEX idx_messages_conversation_id
+    ON messages(conversation_id);
+
+CREATE INDEX idx_messages_sender_id
+    ON messages(sender_id);
+
+CREATE INDEX idx_messages_sent_at
+    ON messages(sent_at);
+
+
+-- Wishlist
+
+CREATE INDEX idx_wishlists_user_id
+    ON wishlists(user_id);
+
+CREATE INDEX idx_wishlists_property_id
+    ON wishlists(property_id);
+
+
+-- Reviews
+
+CREATE INDEX idx_reviews_property_id
+    ON reviews(property_id);
+
+CREATE INDEX idx_reviews_user_id
+    ON reviews(user_id);
+
+
+-- Reports
+
+CREATE INDEX idx_reports_target
+    ON reports(target_type, target_id);
+
+CREATE INDEX idx_reports_status
+    ON reports(status);
+
+
+-- Payments
+
+CREATE INDEX idx_payments_user_id
+    ON payments(user_id);
+
+CREATE INDEX idx_payments_booking_id
+    ON payments(booking_id);
+
+CREATE INDEX idx_payments_purchase_request_id
+    ON payments(purchase_request_id);
+
+CREATE INDEX idx_payments_status
+    ON payments(status);
+
+
+-- Notifications
+
+CREATE INDEX idx_notifications_user_id
+    ON notifications(user_id);
+
+CREATE INDEX idx_notifications_unread
+    ON notifications(user_id, is_read);
+
+#### YAHAN tak
+-- ============================================================
+-- UPDATED_AT TRIGGER
+-- Automatically updates updated_at fields.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER update_users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_host_profiles_updated_at
+BEFORE UPDATE ON host_profiles
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_properties_updated_at
+BEFORE UPDATE ON properties
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_bookings_updated_at
+BEFORE UPDATE ON bookings
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_purchase_requests_updated_at
+BEFORE UPDATE ON purchase_requests
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_host_verifications_updated_at
+BEFORE UPDATE ON host_verifications
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_conversations_updated_at
+BEFORE UPDATE ON conversations
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_reviews_updated_at
+BEFORE UPDATE ON reviews
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_reports_updated_at
+BEFORE UPDATE ON reports
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_payout_accounts_updated_at
+BEFORE UPDATE ON payout_accounts
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+
+CREATE TRIGGER update_payments_updated_at
+BEFORE UPDATE ON payments
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+```
